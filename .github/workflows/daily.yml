@@ -1,0 +1,18 @@
+name: Daily Data Analytics Problem
+on:
+  schedule:
+    - cron: "0 5 * * *"     # 05:00 UTC ≈ 08:00 Lithuania time in summer
+  workflow_dispatch:          # adds a manual "Run workflow" button
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - run: python daily_leetcode_2.py
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          DATABASE_ID: ${{ secrets.DATABASE_ID }}
