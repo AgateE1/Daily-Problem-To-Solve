@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 """
-Daily LeetCode picker for Notion.
+Daily LeetCode picker for Notion (updated for the 2025-09-03 data sources API).
 
 Picks one random not-yet-completed problem from your Notion database,
 clears any previous "Today" flag, and marks the chosen one as today's problem.
 
 Setup:
-  1. Create an internal integration at https://www.notion.so/my-integrations
-     and copy its token (starts with "ntn_" or "secret_").
-  2. Share your LeetCode database with that integration:
-     open the database -> ••• menu -> Connections -> add your integration.
+  1. Create an internal integration and copy its token (starts with "ntn_").
+  2. Open your database as a full page -> ••• -> Connections -> add the integration.
   3. Set environment variables NOTION_TOKEN and DATABASE_ID.
        - DATABASE_ID is the 32-char string in the database URL.
   4. Your database needs two checkbox properties named exactly:
        - "Today"      (the picker sets this)
        - "Completed"  (you check this when you finish a problem)
-  5. Run:  pip install requests  &&  python daily_leetcode.py
+  5. Run:  pip install requests  &&  python daily_leetcode_2.py
 """
 
 import os
@@ -29,12 +27,24 @@ DATABASE_ID = os.environ["DATABASE_ID"]
 API = "https://api.notion.com/v1"
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
-    "Notion-Version": "2022-06-28",
+    "Notion-Version": "2025-09-03",   # <-- new data-sources API version
     "Content-Type": "application/json",
 }
 
 
-def query_all(filter_):
+def get_data_source_id():
+    """A database is now a container of one or more data sources.
+    Look up the first data source's ID for this database."""
+    r = requests.get(f"{API}/databases/{DATABASE_ID}", headers=HEADERS)
+    r.raise_for_status()
+    sources = r.json().get("data_sources", [])
+    if not sources:
+        print("No data sources found on this database.")
+        sys.exit(1)
+    return sources[0]["id"]
+
+
+def query_all(data_source_id, filter_):
     """Return every page matching a filter, following pagination."""
     results, cursor = [], None
     while True:
@@ -42,7 +52,9 @@ def query_all(filter_):
         if cursor:
             body["start_cursor"] = cursor
         r = requests.post(
-            f"{API}/databases/{DATABASE_ID}/query", headers=HEADERS, json=body
+            f"{API}/data_sources/{data_source_id}/query",
+            headers=HEADERS,
+            json=body,
         )
         r.raise_for_status()
         data = r.json()
@@ -71,12 +83,14 @@ def title_of(page):
 
 
 def main():
+    ds = get_data_source_id()
+
     # 1. Clear yesterday's pick.
-    for page in query_all({"property": "Today", "checkbox": {"equals": True}}):
+    for page in query_all(ds, {"property": "Today", "checkbox": {"equals": True}}):
         set_checkbox(page["id"], "Today", False)
 
     # 2. Gather all problems not yet completed.
-    pool = query_all({"property": "Completed", "checkbox": {"equals": False}})
+    pool = query_all(ds, {"property": "Completed", "checkbox": {"equals": False}})
     if not pool:
         print("Nothing left -- you've completed every problem.")
         sys.exit(0)
