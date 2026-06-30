@@ -88,4 +88,4 @@ on:
 
 A personal learning project — a working end-to-end tool rather than a
 production system. Built to make daily SQL and Pandas practice automatic and
-self-tracking
+self-tracking.
